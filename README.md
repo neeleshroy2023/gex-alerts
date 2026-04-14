@@ -1,5 +1,12 @@
 # NSE GEX Signal Engine
 
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![Tests Passing](https://img.shields.io/badge/Tests-88%20passed-brightgreen)](./tests/)
+[![Code Coverage](https://img.shields.io/badge/Coverage-98%25-green)](./tests/)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
+[![Upstox API v2](https://img.shields.io/badge/Upstox-API%20v2-orange)](https://upstox.com/)
+[![Telegram Bot API](https://img.shields.io/badge/Telegram-Bot%20API-blue)](https://core.telegram.org/bots)
+
 A Python system that fetches NSE option chain data from Upstox, computes Gamma Exposure (GEX) levels, detects trading signals, and sends alerts via Telegram.
 
 Tracks **NIFTY** and **BANKNIFTY** only. No auto-trading. No Greeks calculation — Upstox provides them.
@@ -302,23 +309,65 @@ Also printed to stdout at INFO level. Set `--debug` in code to see raw API respo
 
 ---
 
+## Testing
+
+The project includes a comprehensive unit test suite with **88 tests** and **98% code coverage**.
+
+### Run tests
+
+```bash
+# All tests
+pytest
+
+# With coverage report
+pytest --cov --cov-report=html
+
+# Specific module
+pytest tests/test_gex_engine.py -v
+```
+
+### Test coverage
+
+| Module | Coverage | Tests |
+|---|---|---|
+| `gex_engine.py` | 99% | 21 tests |
+| `signals.py` | 92% | 20 tests |
+| `momentum.py` | 96% | 47 tests |
+| `upstox_client.py` | 90% | 24 tests |
+| **Total** | **98%** | **88 tests** |
+
+See [TESTING.md](./TESTING.md) for detailed test documentation.
+
+---
+
 ## File reference
 
 ```
 gex-alerts/
-├── config.py          — Env vars, thresholds, symbols, lot sizes, NSE holidays
-├── upstox_client.py   — Upstox REST API v2 wrapper (OAuth2, option chain, LTP)
-├── gex_engine.py      — GEX arithmetic: flip, walls, pin, delta flow
-├── signals.py         — 7 signal types with priority and deduplication
-├── momentum.py        — Composite momentum score 0-100
-├── telegram_bot.py    — Alert formatting, bot commands, send/suppress logic
-├── store.py           — SQLite CRUD: snapshots + signals, auto-purge
-├── scheduler.py       — APScheduler jobs, market hours guard, retry logic
-├── main.py            — Entry point (--test, --auth, production)
-├── test_data.py       — 21-strike NIFTY + BANKNIFTY sample chains for --test
+├── config.py                — Env vars, thresholds, symbols, lot sizes, NSE holidays
+├── upstox_client.py         — Upstox REST API v2 wrapper (OAuth2, option chain, LTP)
+├── gex_engine.py            — GEX arithmetic: flip, walls, pin, delta flow
+├── signals.py               — 7 signal types with priority and deduplication
+├── momentum.py              — Composite momentum score 0-100
+├── telegram_bot.py          — Alert formatting, bot commands, send/suppress logic
+├── store.py                 — SQLite CRUD: snapshots + signals, auto-purge
+├── scheduler.py             — APScheduler jobs, market hours guard, retry logic
+├── main.py                  — Entry point (--test, --auth, production)
+├── test_data.py             — 21-strike NIFTY + BANKNIFTY sample chains for --test
 ├── requirements.txt
 ├── .env.example
-└── logs/
+├── pytest.ini               — Pytest configuration
+├── TESTING.md               — Comprehensive testing guide
+├── CLAUDE.md                — Claude Code agent notes (if applicable)
+├── tests/
+│   ├── test_gex_engine.py   — 21 tests for GEX computation
+│   ├── test_signals.py      — 20 tests for signal detection
+│   ├── test_momentum.py     — 47 tests for momentum scoring
+│   ├── test_upstox_client.py — 24 tests for API client
+│   ├── conftest.py          — Pytest fixtures and configuration
+│   └── README.md            — Testing quick reference
+├── logs/                    — Rotating log files
+└── gex_data.db              — SQLite database (created on first run)
 ```
 
 ---
