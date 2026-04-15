@@ -100,102 +100,60 @@ class TestDetectSignals:
         momentum_signals = [s for s in signals if s.type == "MOMENTUM_EXTREME"]
         assert len(momentum_signals) == 0
 
-    def test_wall_breach_bullish(self):
-        """Test WALL_BREACH signal on bullish breakout."""
+    def test_medium_low_signals_filtered_out(self):
+        """Test that MEDIUM/LOW signals are filtered out — only HIGH returned."""
         spot = 22450
         chain = SAMPLE_DATA["NIFTY"]["chain"]
         current = compute_gex(chain, spot, "NIFTY")
 
-        # Modify snapshot to simulate spot breaching call wall
+        # Push spot past call wall to trigger WALL_BREACH (MEDIUM)
         current.spot_price = current.call_wall * 1.002
 
         signals = detect_signals(current, None)
 
-        wall_breaches = [s for s in signals if s.type == "WALL_BREACH"]
-        if wall_breaches:
-            bullish = [s for s in wall_breaches if "BULLISH" in s.message]
-            assert len(bullish) > 0
+        assert all(s.priority == "HIGH" for s in signals)
+        assert not any(s.type == "WALL_BREACH" for s in signals)
 
-    def test_wall_breach_bearish(self):
-        """Test WALL_BREACH signal on bearish breakdown."""
+    def test_no_pin_risk_or_proximity_signals(self):
+        """Test that PIN_RISK and GAMMA_FLIP_PROXIMITY are never returned."""
         spot = 22450
         chain = SAMPLE_DATA["NIFTY"]["chain"]
         current = compute_gex(chain, spot, "NIFTY")
 
-        # Modify snapshot to simulate spot breaching put wall
-        current.spot_price = current.put_wall * 0.998
+        # Force spot right on top of max gamma strike and gamma flip
+        current.spot_price = current.max_gamma_strike
+        current.gamma_flip = current.max_gamma_strike
 
         signals = detect_signals(current, None)
 
-        wall_breaches = [s for s in signals if s.type == "WALL_BREACH"]
-        if wall_breaches:
-            bearish = [s for s in wall_breaches if "BEARISH" in s.message]
-            assert len(bearish) > 0
+        assert not any(s.type in ("PIN_RISK", "GAMMA_FLIP_PROXIMITY") for s in signals)
 
-    def test_gex_magnitude_shift_signal(self):
-        """Test GEX_MAGNITUDE_SHIFT signal on large GEX change."""
+    def test_gex_magnitude_shift_filtered(self):
+        """Test that GEX_MAGNITUDE_SHIFT (MEDIUM) is filtered out."""
         spot = 22450
         chain = SAMPLE_DATA["NIFTY"]["chain"]
 
         previous = compute_gex(chain, spot, "NIFTY")
         current = compute_gex(chain, spot, "NIFTY")
-
-        # Modify to simulate large GEX shift
         current.total_gex = previous.total_gex * 1.5
 
         signals = detect_signals(current, previous)
 
-        magnitude_shifts = [s for s in signals if s.type == "GEX_MAGNITUDE_SHIFT"]
-        # Should detect shift if change is > 40%
-        if magnitude_shifts:
-            assert magnitude_shifts[0].priority == "MEDIUM"
+        assert not any(s.type == "GEX_MAGNITUDE_SHIFT" for s in signals)
 
-    def test_gamma_flip_proximity_signal(self):
-        """Test GAMMA_FLIP_PROXIMITY signal."""
-        spot = 22450
-        chain = SAMPLE_DATA["NIFTY"]["chain"]
-        current = compute_gex(chain, spot, "NIFTY")
-
-        # Modify spot to be very close to gamma flip
-        current.spot_price = current.gamma_flip * 1.001
-
-        signals = detect_signals(current, None)
-
-        proximity_signals = [s for s in signals if s.type == "GAMMA_FLIP_PROXIMITY"]
-        if proximity_signals:
-            assert proximity_signals[0].priority == "MEDIUM"
-
-    def test_pin_risk_signal(self):
-        """Test PIN_RISK signal."""
-        spot = 22450
-        chain = SAMPLE_DATA["NIFTY"]["chain"]
-        current = compute_gex(chain, spot, "NIFTY")
-
-        # Modify spot to be very close to max gamma strike
-        current.spot_price = current.max_gamma_strike * 1.0005
-
-        signals = detect_signals(current, None)
-
-        pin_signals = [s for s in signals if s.type == "PIN_RISK"]
-        if pin_signals:
-            assert pin_signals[0].priority == "LOW"
-
-    def test_signals_sorted_by_priority(self):
-        """Test that signals are returned sorted by priority."""
+    def test_only_high_priority_returned(self):
+        """Test that only HIGH priority signals are ever returned."""
         spot = 22450
         chain = SAMPLE_DATA["NIFTY"]["chain"]
         current = compute_gex(chain, spot, "NIFTY")
 
         signals = detect_signals(current, None, momentum_score=90)
 
-        # Check that HIGH priority signals come before others
-        priority_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
-        priorities = [priority_order[s.priority] for s in signals]
-        assert priorities == sorted(priorities)
+        for s in signals:
+            assert s.priority == "HIGH"
 
     def test_empty_signals_list(self):
-        """Test that neutral conditions return minimal signals."""
-        # Create a neutral GEX snapshot
+        """Test that neutral conditions return no signals."""
         snap = GEXSnapshot(
             symbol="NIFTY",
             spot_price=22500,
@@ -210,10 +168,7 @@ class TestDetectSignals:
 
         signals = detect_signals(snap, None, momentum_score=50)
 
-        # PIN_RISK might still be triggered if spot is exactly at max_gamma_strike
-        # So we just check that we don't get high-priority signals
-        high_priority = [s for s in signals if s.priority == "HIGH"]
-        assert len(high_priority) == 0
+        assert len(signals) == 0
 
 
 class TestDetectVolumeSpike:
