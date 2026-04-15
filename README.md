@@ -63,13 +63,13 @@ RISK_FREE_RATE=6.5
 
 **Where to find these values:**
 
-| Variable | Where to get it |
-|---|---|
-| `UPSTOX_API_KEY` | Upstox Developer Portal → Your App → API Key |
-| `UPSTOX_API_SECRET` | Upstox Developer Portal → Your App → Secret Key |
-| `UPSTOX_ACCESS_TOKEN` | Generated in Step 3 below |
-| `TELEGRAM_BOT_TOKEN` | From [@BotFather](https://t.me/BotFather) → `/newbot` |
-| `TELEGRAM_CHAT_ID` | Send a message to your bot, then visit `https://api.telegram.org/bot<TOKEN>/getUpdates` |
+| Variable              | Where to get it                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| `UPSTOX_API_KEY`      | Upstox Developer Portal → Your App → API Key                                            |
+| `UPSTOX_API_SECRET`   | Upstox Developer Portal → Your App → Secret Key                                         |
+| `UPSTOX_ACCESS_TOKEN` | Generated in Step 3 below                                                               |
+| `TELEGRAM_BOT_TOKEN`  | From [@BotFather](https://t.me/BotFather) → `/newbot`                                   |
+| `TELEGRAM_CHAT_ID`    | Send a message to your bot, then visit `https://api.telegram.org/bot<TOKEN>/getUpdates` |
 
 ---
 
@@ -93,6 +93,7 @@ python main.py --auth
 ```
 
 Output:
+
 ```
 Open this URL in your browser to authorize:
 
@@ -147,6 +148,97 @@ The engine will hot-swap the token without restarting.
 
 ---
 
+## Deploying on AWS (recommended)
+
+Run the engine in the cloud for ~**$1.30/month**. The instance only runs during market hours (9:05 AM – 3:40 PM IST, Mon–Fri), so you pay for ~125h/month instead of 730h.
+
+### Architecture
+
+```
+EventBridge (free)
+├── 8:50 AM IST  → Lambda sends Upstox auth link to Telegram
+├── 9:05 AM IST  → Lambda starts EC2
+└── 3:40 PM IST  → Lambda stops EC2
+
+EC2 t4g.nano (arm64, ap-south-1)
+└── On start: reads all secrets from SSM → runs python main.py
+
+SSM Parameter Store (free)  — stores all secrets, no .env on server
+API Gateway + Lambda         — captures OAuth callback, saves fresh token to SSM
+```
+
+### Cost breakdown
+
+| Service                    | Monthly cost      |
+| -------------------------- | ----------------- |
+| EC2 t4g.nano (125h/month)  | ~$0.53            |
+| EBS gp3 8 GB               | ~$0.64            |
+| Lambda / EventBridge / SSM | $0.00 (free tier) |
+| **Total**                  | **~$1.30**        |
+
+### Prerequisites
+
+- AWS CLI v2 configured (`aws configure`) with sufficient IAM permissions
+- Python 3.11+ locally (for running tests)
+
+### One-time setup
+
+```bash
+bash aws/setup.sh
+```
+
+This provisions everything interactively — prompts for your Upstox and Telegram credentials, creates all AWS resources, and deploys the code.
+
+At the end it prints a **Callback URL**. Update your Upstox Developer Console:
+
+> **Redirect URI** → `https://<id>.execute-api.ap-south-1.amazonaws.com/prod/callback`
+
+### Daily token rotation (automated)
+
+Upstox tokens expire daily at midnight IST. The flow is fully automated:
+
+1. **8:50 AM** — Lambda sends a Telegram message with a one-tap auth link
+2. **You tap the link** → Upstox login → redirected to the API Gateway callback URL
+3. **Lambda** exchanges the OAuth code for a new token and saves it to SSM
+4. **9:05 AM** — EC2 starts, reads the fresh token from SSM, launches the engine
+
+If you miss the morning tap, the Telegram `/token` command hot-swaps the token into the running process.
+
+### Deploying code changes
+
+```bash
+bash aws/deploy.sh <instance-id>
+```
+
+To start the server
+
+```bash
+aws ec2 start-instances --instance-ids <instanceId> --region <region> --query "StartingInstances[0].CurrentState.Name" --output text
+```
+
+To stop the server
+
+```bash
+aws ec2 stop-instances --instance-ids <instanceId> --region <region>
+```
+
+Opens SSH from your current IP, uploads the code, restarts the service, then closes SSH. Requires `~/.ssh/gex-alerts-deploy` (generated during setup).
+
+### AWS file reference
+
+```
+aws/
+├── setup.sh          — One-shot infrastructure provisioning (run once)
+├── deploy.sh         — Push code changes and restart service
+├── ec2_userdata.sh   — EC2 bootstrap script (runs on first boot)
+└── lambda/
+    ├── oauth_callback.py  — Captures OAuth code → stores token in SSM
+    ├── token_notifier.py  — Sends daily Telegram auth link at 8:50 AM
+    └── ec2_scheduler.py   — Starts / stops EC2 via EventBridge
+```
+
+---
+
 ## Step 4 — Smoke test (no API keys needed)
 
 Before connecting to live APIs, verify the engine works with sample data:
@@ -196,6 +288,7 @@ python main.py
 ```
 
 At startup the engine:
+
 1. Validates all `.env` variables
 2. Tests the Upstox connection (`GET /v2/market-quote/ltp`)
 3. Sends a Telegram message: `🟢 GEX Engine Starting...`
@@ -209,12 +302,12 @@ If Upstox fails at startup, the bot still starts so you can use `/token` to fix 
 
 ## Scheduled jobs
 
-| Job | When | What |
-|---|---|---|
-| `fetch_and_analyze` | Every 3 min, market hours | Fetch option chain → compute GEX → detect signals → send alerts |
-| `send_summary` | Every 30 min, market hours | Summary table for all symbols |
-| `pre_market_check` | 9:10 AM, weekdays | Verify connections, send "Engine Online" |
-| `post_market_summary` | 3:35 PM, weekdays | EOD summary with total signals count |
+| Job                   | When                       | What                                                            |
+| --------------------- | -------------------------- | --------------------------------------------------------------- |
+| `fetch_and_analyze`   | Every 3 min, market hours  | Fetch option chain → compute GEX → detect signals → send alerts |
+| `send_summary`        | Every 30 min, market hours | Summary table for all symbols                                   |
+| `pre_market_check`    | 9:10 AM, weekdays          | Verify connections, send "Engine Online"                        |
+| `post_market_summary` | 3:35 PM, weekdays          | EOD summary with total signals count                            |
 
 Market hours: **9:15 AM – 3:30 PM IST, Monday–Friday**, skipping NSE holidays.
 
@@ -222,28 +315,28 @@ Market hours: **9:15 AM – 3:30 PM IST, Monday–Friday**, skipping NSE holiday
 
 ## Telegram bot commands
 
-| Command | Description |
-|---|---|
-| `/status` | Full current state: regime, momentum, all key levels |
-| `/levels` | One-liner per symbol with flip / walls / pin |
-| `/score` | Momentum score with visual bar and interpretation |
-| `/history` | Last 5 gamma flip (regime change) events |
-| `/token <token>` | Hot-swap the Upstox access token |
-| `/help` | List all commands |
+| Command          | Description                                          |
+| ---------------- | ---------------------------------------------------- |
+| `/status`        | Full current state: regime, momentum, all key levels |
+| `/levels`        | One-liner per symbol with flip / walls / pin         |
+| `/score`         | Momentum score with visual bar and interpretation    |
+| `/history`       | Last 5 gamma flip (regime change) events             |
+| `/token <token>` | Hot-swap the Upstox access token                     |
+| `/help`          | List all commands                                    |
 
 ---
 
 ## Signal types
 
-| Signal | Priority | Trigger |
-|---|---|---|
-| `GAMMA_FLIP` 🔴 | HIGH | GEX regime changed sign (POSITIVE ↔ NEGATIVE) |
-| `GAMMA_SQUEEZE` 🟡 | HIGH | Negative regime + spot within 0.5% of flip + volume spike |
-| `MOMENTUM_EXTREME` 🔵 | HIGH | Score > 80 (strong bullish) or < 20 (strong bearish) |
-| `WALL_BREACH` 🟢/🔻 | MEDIUM | Spot breaks above call wall or below put wall |
-| `GEX_MAGNITUDE_SHIFT` ⚡ | MEDIUM | Total GEX changed by > 40% in one cycle |
-| `GAMMA_FLIP_PROXIMITY` 📍 | MEDIUM | Spot within 0.3% of gamma flip level |
-| `PIN_RISK` 📌 | LOW | Spot within 0.2% of max gamma strike |
+| Signal                    | Priority | Trigger                                                   |
+| ------------------------- | -------- | --------------------------------------------------------- |
+| `GAMMA_FLIP` 🔴           | HIGH     | GEX regime changed sign (POSITIVE ↔ NEGATIVE)             |
+| `GAMMA_SQUEEZE` 🟡        | HIGH     | Negative regime + spot within 0.5% of flip + volume spike |
+| `MOMENTUM_EXTREME` 🔵     | HIGH     | Score > 80 (strong bullish) or < 20 (strong bearish)      |
+| `WALL_BREACH` 🟢/🔻       | MEDIUM   | Spot breaks above call wall or below put wall             |
+| `GEX_MAGNITUDE_SHIFT` ⚡  | MEDIUM   | Total GEX changed by > 40% in one cycle                   |
+| `GAMMA_FLIP_PROXIMITY` 📍 | MEDIUM   | Spot within 0.3% of gamma flip level                      |
+| `PIN_RISK` 📌             | LOW      | Spot within 0.2% of max gamma strike                      |
 
 **Deduplication**: The same signal type + symbol is suppressed for 15 minutes after sending. `GAMMA_FLIP` and `WALL_BREACH` are never suppressed.
 
@@ -253,20 +346,20 @@ Market hours: **9:15 AM – 3:30 PM IST, Monday–Friday**, skipping NSE holiday
 
 The score is a weighted composite of four components:
 
-| Component | Weight | What it measures |
-|---|---|---|
-| GEX Regime | 35% | Negative GEX (amplified moves) vs positive (mean reversion) |
-| Delta Flow | 30% | Net dealer hedging direction (bullish vs bearish) |
-| GEX Rate of Change | 20% | How fast GEX is shifting this cycle |
-| PCR GEX | 15% | Put/call GEX ratio (> 1.3 = oversold, < 0.7 = overbought) |
+| Component          | Weight | What it measures                                            |
+| ------------------ | ------ | ----------------------------------------------------------- |
+| GEX Regime         | 35%    | Negative GEX (amplified moves) vs positive (mean reversion) |
+| Delta Flow         | 30%    | Net dealer hedging direction (bullish vs bearish)           |
+| GEX Rate of Change | 20%    | How fast GEX is shifting this cycle                         |
+| PCR GEX            | 15%    | Put/call GEX ratio (> 1.3 = oversold, < 0.7 = overbought)   |
 
-| Score | Interpretation |
-|---|---|
-| > 75 | Strong bullish — dealers amplifying upside |
-| 60–75 | Moderate bullish lean |
-| 40–60 | Neutral / choppy — no clear edge |
-| 25–40 | Moderate bearish lean |
-| < 25 | Strong bearish — dealers amplifying downside |
+| Score | Interpretation                               |
+| ----- | -------------------------------------------- |
+| > 75  | Strong bullish — dealers amplifying upside   |
+| 60–75 | Moderate bullish lean                        |
+| 40–60 | Neutral / choppy — no clear edge             |
+| 25–40 | Moderate bearish lean                        |
+| < 25  | Strong bearish — dealers amplifying downside |
 
 ---
 
@@ -328,13 +421,13 @@ pytest tests/test_gex_engine.py -v
 
 ### Test coverage
 
-| Module | Coverage | Tests |
-|---|---|---|
-| `gex_engine.py` | 99% | 21 tests |
-| `signals.py` | 92% | 20 tests |
-| `momentum.py` | 96% | 47 tests |
-| `upstox_client.py` | 90% | 24 tests |
-| **Total** | **98%** | **88 tests** |
+| Module             | Coverage | Tests        |
+| ------------------ | -------- | ------------ |
+| `gex_engine.py`    | 99%      | 21 tests     |
+| `signals.py`       | 92%      | 20 tests     |
+| `momentum.py`      | 96%      | 47 tests     |
+| `upstox_client.py` | 90%      | 24 tests     |
+| **Total**          | **98%**  | **88 tests** |
 
 See [TESTING.md](./TESTING.md) for detailed test documentation.
 
@@ -358,7 +451,14 @@ gex-alerts/
 ├── .env.example
 ├── pytest.ini               — Pytest configuration
 ├── TESTING.md               — Comprehensive testing guide
-├── CLAUDE.md                — Claude Code agent notes (if applicable)
+├── aws/
+│   ├── setup.sh             — One-shot AWS infrastructure provisioning
+│   ├── deploy.sh            — Push code changes to EC2 and restart service
+│   ├── ec2_userdata.sh      — EC2 bootstrap (runs on first boot)
+│   └── lambda/
+│       ├── oauth_callback.py    — OAuth redirect handler → stores token in SSM
+│       ├── token_notifier.py    — Daily Telegram auth reminder at 8:50 AM IST
+│       └── ec2_scheduler.py    — Start / stop EC2 triggered by EventBridge
 ├── tests/
 │   ├── test_gex_engine.py   — 21 tests for GEX computation
 │   ├── test_signals.py      — 20 tests for signal detection
