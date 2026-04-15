@@ -168,6 +168,9 @@ def detect_signals(
             },
         ))
 
+    # Only keep HIGH-priority signals (GAMMA_FLIP, GAMMA_SQUEEZE, MOMENTUM_EXTREME)
+    signals = [s for s in signals if s.priority == "HIGH"]
+
     for sig in signals:
         logger.info("Signal: [%s] %s %s — %s", sig.priority, sig.type, sig.symbol, sig.message)
 

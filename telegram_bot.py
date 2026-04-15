@@ -130,9 +130,12 @@ class TelegramAlertBot:
         delta_sign = "+" if delta_cr >= 0 else ""
         delta_dir = "Bullish" if delta_cr >= 0 else "Bearish"
 
+        trade = _trade_suggestion(signal, snapshot)
+
         text = (
             f"{emoji} <b>{signal.type.replace('_', ' ')}</b> — {signal.symbol}\n\n"
-            f"\u26a1 {signal.message}\n\n"
+            f"\u26a1 {signal.message}\n"
+            f"\U0001f4b9 <b>Trade Idea:</b> {trade}\n\n"
             f"\U0001f4ca Momentum: {momentum_score}/100 ({interp})\n"
             f"\U0001f4cd Spot: \u20b9{snapshot.spot_price:,.0f}\n\n"
             f"\U0001f3af <b>Key Levels:</b>\n"
@@ -380,3 +383,46 @@ def _is_market_hours(now: datetime) -> bool:
 def _score_bar(score: int, width: int = 20) -> str:
     filled = int(score / 100 * width)
     return "[" + "\u2588" * filled + "\u2591" * (width - filled) + "]"
+
+
+def _trade_suggestion(signal: Signal, snapshot: "GEXSnapshot") -> str:
+    """Return a concrete BUY suggestion for the given signal.
+
+    Only HIGH-priority signals reach this function.  All suggestions are
+    buy-only (calls, puts, or straddles — never short options).
+    Strike is rounded to the nearest standard step so the user can act
+    directly without looking up the chain.
+    """
+    symbol = signal.symbol
+    lot = config.LOT_SIZES.get(symbol, 25)
+    step = config.STRIKE_STEPS.get(symbol, 50)
+    atm = int(round(snapshot.spot_price / step) * step)
+    s_type = signal.type
+
+    if s_type == "GAMMA_FLIP":
+        new_regime = signal.data.get("new_regime", "")
+        if new_regime == "NEGATIVE":
+            # Amplified-move regime: go with spot direction confirmed by delta flow
+            if snapshot.spot_price >= snapshot.gamma_flip and snapshot.net_delta_flow >= 0:
+                return f"BUY {atm} CE | 1 lot ({lot} units) | Hold: intraday"
+            elif snapshot.spot_price < snapshot.gamma_flip and snapshot.net_delta_flow <= 0:
+                return f"BUY {atm} PE | 1 lot ({lot} units) | Hold: intraday"
+            else:
+                return f"BUY {atm} CE + {atm} PE (straddle) | 1 lot each | Hold: intraday"
+        else:  # POSITIVE — mean-reversion regime, no buy setup
+            return "NO TRADE — mean-reversion regime favors option sellers"
+
+    if s_type == "GAMMA_SQUEEZE":
+        if snapshot.net_delta_flow > 0:
+            return f"BUY {atm} CE | 1 lot ({lot} units) | Hold: 15–45 min"
+        elif snapshot.net_delta_flow < 0:
+            return f"BUY {atm} PE | 1 lot ({lot} units) | Hold: 15–45 min"
+        return f"BUY {atm} CE + {atm} PE (straddle) | 1 lot each | Hold: 15–45 min"
+
+    if s_type == "MOMENTUM_EXTREME":
+        direction = signal.data.get("direction", "")
+        if direction == "BULLISH":
+            return f"BUY {atm} CE | 1 lot ({lot} units) | Hold: intraday"
+        return f"BUY {atm} PE | 1 lot ({lot} units) | Hold: intraday"
+
+    return "—"
