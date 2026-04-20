@@ -101,7 +101,7 @@ Current test coverage includes:
 
 ## Sample Data
 
-Tests use realistic sample data for NIFTY and BANKNIFTY from `test_data.py`:
+Tests use realistic sample data for BANKNIFTY from `test_data.py`:
 - Complete option chain with Greeks
 - Strike clustering at support/resistance levels
 - Realistic OI, volume, and IV distributions
