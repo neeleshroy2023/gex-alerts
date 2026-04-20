@@ -68,7 +68,7 @@ Opens `htmlcov/index.html` in your browser for interactive coverage visualizatio
   - Floating-point precision
 
 - `TestComputeGEX` (6 tests)
-  - Real-world data (NIFTY, BANKNIFTY from sample data)
+  - Real-world data (BANKNIFTY from sample data)
   - Empty chain handling
   - Missing Greeks gracefully ignored
   - Invalid strikes filtered
@@ -167,7 +167,7 @@ Opens `htmlcov/index.html` in your browser for interactive coverage visualizatio
   - HTTP client invalidation
 
 - `TestGetOptionChain` (2 tests)
-  - NIFTY option chain fetching
+  - BANKNIFTY option chain fetching
   - Invalid symbol handling
 
 - `TestGetSpotPrice` (4 tests)
@@ -195,7 +195,6 @@ Opens `htmlcov/index.html` in your browser for interactive coverage visualizatio
 
 All tests use realistic sample data from `test_data.py`:
 
-- **NIFTY**: 21 strikes (21500-23500 with 100pt intervals)
 - **BANKNIFTY**: 21 strikes (46500-50500 with 200pt intervals)
 - Complete Greeks (delta, gamma, theta, vega, IV)
 - Realistic OI, volume, and bid-ask spreads

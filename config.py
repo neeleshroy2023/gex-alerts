@@ -21,23 +21,20 @@ TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
 RISK_FREE_RATE: float = float(os.getenv("RISK_FREE_RATE", "6.5"))
 
 # Symbols tracked
-SYMBOLS: list[str] = ["NIFTY", "BANKNIFTY"]
+SYMBOLS: list[str] = ["BANKNIFTY"]
 
 # Upstox instrument keys for index spot prices
 INDEX_INSTRUMENT_KEYS: dict[str, str] = {
-    "NIFTY": "NSE_INDEX|Nifty 50",
     "BANKNIFTY": "NSE_INDEX|Nifty Bank",
 }
 
 # Lot sizes (used for display / normalization)
 LOT_SIZES: dict[str, int] = {
-    "NIFTY": 25,
     "BANKNIFTY": 15,
 }
 
 # Strike step for each index
 STRIKE_STEPS: dict[str, int] = {
-    "NIFTY": 50,
     "BANKNIFTY": 100,
 }
 

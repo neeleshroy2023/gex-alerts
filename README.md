@@ -9,7 +9,7 @@
 
 A Python system that fetches NSE option chain data from Upstox, computes Gamma Exposure (GEX) levels, detects trading signals, and sends alerts via Telegram.
 
-Tracks **NIFTY** and **BANKNIFTY** only. No auto-trading. No Greeks calculation — Upstox provides them.
+Tracks **BANKNIFTY** only. No auto-trading. No Greeks calculation — Upstox provides them.
 
 ---
 
@@ -255,25 +255,25 @@ Expected output:
 ============================================================
 
 ——————————————————————————————————————————————————
-  NIFTY  |  Spot: 22,450  |  Expiry: 2026-04-16
+  BANKNIFTY  |  Spot: 48,320  |  Expiry: 2026-04-16
 ——————————————————————————————————————————————————
 
   Regime:      POSITIVE
   Total GEX:   6.33e+10
-  Gamma Flip:  22,143
-  Put Wall:    22,500  (Support)
-  Call Wall:   22,500  (Resistance)
-  Max Gamma:   23,000  (Pin)
+  Gamma Flip:  48,143
+  Put Wall:    48,500  (Support)
+  Call Wall:   48,500  (Resistance)
+  Max Gamma:   49,000  (Pin)
   PCR GEX:     0.97
   Delta Flow:  44,830
 
   Momentum:    56/100 (Neutral)
 
   Signals (1):
-    [MEDIUM] WALL_BREACH: BEARISH breakdown — spot 22450 breached put wall at 22500
+    [MEDIUM] WALL_BREACH: BEARISH breakdown — spot 48320 breached put wall at 48500
 
   Top GEX Strikes:
-      23,000 | + ############################## (1.14e+11)
+      49,000 | + ############################## (1.14e+11)
       ...
 ```
 
@@ -446,7 +446,7 @@ gex-alerts/
 ├── store.py                 — SQLite CRUD: snapshots + signals, auto-purge
 ├── scheduler.py             — APScheduler jobs, market hours guard, retry logic
 ├── main.py                  — Entry point (--test, --auth, production)
-├── test_data.py             — 21-strike NIFTY + BANKNIFTY sample chains for --test
+├── test_data.py             — 21-strike BANKNIFTY sample chain for --test
 ├── requirements.txt
 ├── .env.example
 ├── pytest.ini               — Pytest configuration
